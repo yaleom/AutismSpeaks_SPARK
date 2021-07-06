@@ -1,0 +1,55 @@
+---
+title: "Data process pipeline: SPARK"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+
+---
+
+<style>
+a:link {
+    color: black;
+}
+a:visited {
+    color: black;
+}
+ a:hover {
+    color: black;
+}
+</style>
+
+<style type="text/css">
+  .list-group-item.active, .list-group-item.active:focus, .list-group-item.active:hover {
+    z-index: 2;
+    color: #000000;
+    background-color: #FFFFFF;
+    border-color: #000000;
+}
+</style>
+
+<style type="text/css">
+h1.title {
+  font-size: 28px;
+}
+</style>
+
+<br>
+<br>
+This website is created using [RStudio's R Markdown](http://rmarkdown.rstudio.com/) and hosted on [Github](http://github.com). 
+<br><br>
+It is built for communicating the project progress.
+<br><br><br>
+
+
+```{r setup, include=FALSE}
+WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_SPARK/"
+knitr::opts_knit$set(root.dir = WD)
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries 
+library(rmarkdown)
+```
+
+
