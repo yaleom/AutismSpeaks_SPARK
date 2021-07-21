@@ -5,8 +5,7 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
   encoding=encoding,
   output_file=file.path(dirname(input_file), out_dir, 'Genotype.html'))})
-author: "Ying Wang"
-date: "08/03/2021"
+
 output:
   html_document:
    code_folding: hide
@@ -16,7 +15,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_AGP//"
+WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_SPARK/"
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(warnings = FALSE)
 knitr::opts_chunk$set(message  = FALSE)
@@ -37,36 +36,43 @@ library(grid)
 library(gridExtra)
 library(png)
 library(grid)
+library(data.table)
 ```
 
 # Dataset Description
 
-A total of **7880** individuals from **2611** families were genotyped on the Illumina Human1M-Duov3_B or the Human1Mv1_C.
+A total of **26,890** individuals from **8,698** families were genotyped on the GSA-24v1-0_A1.
 
- - 4901 males, 2979 females.
- - 2571 trios, 36 quads, 1 pentas, 3 hexs.
- - 947,233 SNPs were genotyped. 
- - Coordinates were based on Build36.
- 
+ - 15,138 males, 11,752 females.
+ - Individuals in a single family ranged from 2 to 10!
+ - 634,709 SNPs were included in the genotype files. 
+ - Note that coordinates were based on **Build38**.
  
  
 ```{r dataset_check, eval=FALSE, include=FALSE}
-setwd("/QRISdata/Q3457/AGP/GenotypeFiles/")
-fam1 <- read.table("phg000294.v1.NIMH_AutismGenomeProject_v2.genotype-calls-matrixfmt.c1.ARD/SubjectGenotypeFile.AGP.phs000267.v1.p1.20121018.fam", stringsAsFactors = F) ##7880 individuals
-fam2 <- read.table("phg000143.v2.NIMH_AutismGenomeProject.genotype-calls-matrixfmt.Human1Mv1_C.c1.DS-ASD/AGP.phs000267.v1.p1.20110621.clean_3891.fam", stringsAsFactors = F) ##3981 individuals
+setwd("/afm01/UQ/Q3457/SPARK/genotypes/")
+fam <- fread("SPARK.WES1.release.2021_03.genotype.fam")
 
-coms <- intersect(fam1$V2, fam2$V2) ##3981 individuals, fam2 were totally included in fam1
-# 
-# table(fam1$V5)
-# 
-#    1    2 
-# 4901 2979
+fam[!duplicated(V1), .N]
+##8698 families
 
-length(unique(fam1$V1)) ##2611 families
-sums <- data.frame(t(table(fam1$V1)))
-table(sums$Freq)
-#    3    4    5    6 
-# 2571   36    1    3 
+fam[,.N, by = V5]
+#    V5     N
+# 1:  2 11752
+# 2:  1 15138
+
+fam[,.(Freq =.N), by = V1][,.N, by = Freq]
+#     Freq    N
+#  1:    2 2493
+#  2:    3 2767
+#  3:    4 3047
+#  4:    5  179
+#  5:    6   43
+#  6:    1  155
+#  7:    7    9
+#  8:    8    2
+#  9:    9    2
+# 10:   10    1
 
 ```
 
@@ -75,16 +81,17 @@ table(sums$Freq)
 <br>
 
 # Raw Genotype QC 
-## Sex Check  {.tabset .tabset-fade .tabset-pills}
 
-- 141 PRROBLEM
-  - 115 with complete missing chrX genotypes.
-   - 26 with chrX-F ranging from 0.20 to 0.62
+## Sex Check  {.tabset .tabset-fade .tabset-pills}
+- Based on 6,995 QCd (\--geno 0.05 \--maf 0.01 \--hwe 1e-6 \--mind 0.1) CHR-X SNPs.
+- 147 PRROBLEM
+  - 130 ambiguous SNPSEX (close to 0.2/0.8)
+  - 17 with SNPSEX different from PEDSEX (Need further explorations)
  
 ### Mismatch summary
 ```{r}
-sex <- read.table("../outputs/SubjectGenotypeFile.AGP.phs000267.v1.p1.20120806_checksex_pruned.sexcheck", header = T, stringsAsFactors = F)
-sex1 <- sex[sex$STATUS == "PROBLEM" & !is.na(sex$F),]
+sex <- fread("outputs/SPARK.WES1.release.2021_03.genotype_checksex.sexcheck")
+sex1 <- sex[STATUS == "PROBLEM" & !is.na(F),] ##147 rows
 
 datatable(sex1, rownames = FALSE, filter="top", caption = htmltools::tags$caption(
         style = 'caption-side: top; text-align: center; color:black; 
@@ -99,7 +106,7 @@ datatable(sex1, rownames = FALSE, filter="top", caption = htmltools::tags$captio
  
 ### ChrX F distributions
 ```{r sex-dist, out.width="100%", out.height="100%", warning=FALSE}
-grid.raster(readPNG("figures/sexD_pruned.png"))
+grid.raster(readPNG("outputs/sexD.png"))
 ```
 
 ***
@@ -109,31 +116,32 @@ grid.raster(readPNG("figures/sexD_pruned.png"))
 
 ## Pariwise IBD estimation {.tabset .tabset-fade .tabset-pills}
 
-- Relationships (RT): OT (Others), FS (Full Siblings), PO (Parent Offspring) 
-- family ID 483 & 1012 has potential issue
-  - FID:483 with IBD sharing = 1 between IID:328 (Female) and IID:1491 (Female), which were supposed to be ~0. Are they MZ? same individual? The genotype missing rates are 0.1185 and 0.1186 for IID:483_328 and IID:483_1491, respectively. [Drop IID:483_1491, IID:483_4371 and IID:483_993.]
-  -  FID:1012 with IBD sharing = 0.57 between IID:2319 (Female) and IID: 3612 (Female). They are supposed to be FS but recruited into the same FID. Other kinship between FID:1012 can be confirmed. 
-- IBS sharing for other pairs: ranging from 0.44 to 0.58 in FS, from 0.50 to 0.59 in PO, from 0 to 0.12 in OT (which indicating inbreeding between some parents.)
+- Relationships (RT): OT (Others), FS (Full Siblings), HS (Half Siblings), PO (Parent Offspring) 
+- IBS sharing for other pairs, ranging 
+  - from 0.20 to 1.00 in FS, 
+  - from 0.45 to 0.64 in PO, 
+  - from 0.00 to 0.55 in OT 
+  - indicating inbreeding between some parents and possible relatives between families as multiplex included.
 
 
-### Estimated pairwise IBD distributions
-```{r IBD-dist, out.width="100%", out.height="100%", warning=FALSE}
-grid.raster(readPNG("figures/IBD.png"))
+```{r read_genome, include=FALSE, eval=FALSE}
+genome <- fread("outputs/SPARK.WES1.release.2021_03.genotype_pruned_IBD.genome")
+genome[,.(count = .N, mins = min(PI_HAT), maxs = max(PI_HAT)), by = RT]
+#    RT count   mins   maxs
+# 1: PO 21619 0.4519 0.6364
+# 2: OT  5836 0.0000 0.5582
+# 3: FS  4408 0.2026 1.0000
+# 4: HS    10 0.2113 0.5788
 ```
 
 ***
  
 <br>
  
- 
-### Family 483 & 1012
-```{r read_genome}
-genome <- read.table("../outputs/SubjectGenotypeFile.AGP.phs000267.v1.p1.20120806_pruned_IBD.genome", header = T, stringsAsFactors = F)
-genome1 <- genome[genome$FID1 == 483 | genome$FID1 == 1012,]
 
-datatable(genome1, rownames = FALSE, filter="top", caption = htmltools::tags$caption(
-        style = 'caption-side: top; text-align: center; color:black; 
-        font-size:200% ;'), options = list(pageLength = 5, scrollX=T) )
+### Estimated pairwise IBD distributions
+```{r IBD-dist, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/IBD.png"))
 ```
 
 ***
@@ -145,22 +153,8 @@ datatable(genome1, rownames = FALSE, filter="top", caption = htmltools::tags$cap
 
 ### Genome-wide heterozygosity VS missing rates 
 ```{r genomewideHet, out.width="100%", out.height="100%", warning=FALSE}
-grid.raster(readPNG("figures/Het_VS_missing2.png"))
+grid.raster(readPNG("outputs/Het_VS_missing.png"))
 ```
-
-***
- 
-<br>
- 
-**Note** that samples were genotyped in the Human1M-Duov3_B or the Human1Mv1_C. Genotypes for these individuals are an union of the genotypes from both platforms. For missingness, only the intersecting SNPs between two arrays were used.
-
-```{r include=F, eval=FALSE}
-# - In the final merged dataset 947,233 markers are represented. Of these 938,130 are represented on the  Human1M-Duov3_B while 858,052 are on the Human1Mv1_C. 
-# - For individuals on the Human1M-Duov3_B the missingness rate is at least 1% while for individuals genotyped on the Human1Mv1_C it is at least 9%. 
-# - Individuals were checked to have no more than a 5% missingness rate for the platform they were genotyped on. 
-
-```
-
 
 ***
  
@@ -169,7 +163,7 @@ grid.raster(readPNG("figures/Het_VS_missing2.png"))
 
 ### Genome-wide F VS missing rates 
 ```{r genomewideF, out.width="100%", out.height="100%", warning=FALSE}
-grid.raster(readPNG("figures/inbreeding_VS_missing2.png"))
+grid.raster(readPNG("outputs/inbreeding_VS_missing.png"))
 ```
 
 ***
@@ -177,17 +171,16 @@ grid.raster(readPNG("figures/inbreeding_VS_missing2.png"))
 <br>
  
 
-
 # Imputation
 
 ## Pre-imputation
-The imputation pipeline follows that used for SSC dataset. A total of **7769** individuals and ~784K autosomal, ~22K chrX SNPs were used for further impution.
+The imputation pipeline follows that used for SSC dataset. A total of **26867** individuals and ~400K autosomal, ~7K chrX SNPs were used for further impution.
 
 - filters: \--geno 0.05 \--mind 0.1 \--maf 0.01 \--hwe 1e-6
-  - 111 people removed due to missing genotype data (--mind). Their missingness rates ranging from 0.7 to 1.
-  - Total genotyping rate in remaining samples is 0.914029.
-  - 124565 variants removed due to missing genotype data (--geno).
-  - 15633 variants removed due to Hardy-Weinberg exact test.
+  - 23 people removed due to missing genotype data (--mind)..
+  - Total genotyping rate in remaining samples is 0.981795.
+  - 41406 variants removed due to missing genotype data (--geno).
+  - 62974 variants removed due to Hardy-Weinberg exact test.
 
 
 ***
@@ -196,12 +189,13 @@ The imputation pipeline follows that used for SSC dataset. A total of **7769** i
  
 ## After Imputation
 ### Frequency distribution
-- ~7.6M SNPs overlapped SNPs between AGP_imputed and HRC_WGS (passing filters: \--geno 0.05 \--maf 0.01 \--hwe 1e-6)
-- based on same allele
-- **0 SNPs with MAF difference > 0.2**
+
+ - ~6.5M SNPs overlapped SNPs between SPARK_imputed and HRC_WGS (passing filters: \--geno 0.05 \--maf 0.01 \--hwe 1e-6)
+ - based on same allele
+ - **1,376 SNPs with MAF difference > 0.2**
 
 ```{r frq_dis, out.width="100%", out.height="100%", warning=FALSE}
-grid.raster(readPNG("figures/AGP_frq_aftImp.png"))
+grid.raster(readPNG("outputs/frqcheck.png"))
 ```
 
 ***
@@ -213,10 +207,11 @@ grid.raster(readPNG("figures/AGP_frq_aftImp.png"))
 - Project the first 3 PCs based on pruned HapMap3 SNPs onto 1000G
 - Using K-means to calculate distance
 - Assign ancestry based on posterior probability 0.9
-  - 6548 Europeans (EUR), 625 Americans (AMR),  123 South-Asians (SAS), 99 East-Asians (EAS) and 141 Africans (AFR).
+  - 20,353 Europeans (EUR), 4,068 Americans (AMR),  565 South-Asians (SAS), 364 East-Asians (EAS) and 1,024 Africans (AFR).
 
 ```{r plot_anc_all, out.width="80%", out.height="60%", echo=FALSE}
-toAssign <- read.table("../outputs/agp_anc.txt", header = T, stringsAsFactors = F)
+
+toAssign <- fread("outputs/SPARK_anc.txt", header = T)
 
 ggplot(data = toAssign, aes(x = PC1, y = PC2, color = Assigned)) +
   geom_point() +
