@@ -5,8 +5,6 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
  encoding=encoding,
  output_file=file.path(dirname(input_file), out_dir, 'Phenotype.html'))})
-author: "Ying Wang"
-date: "15/01/2021"
 output: 
   html_document:
    code_folding: hide
