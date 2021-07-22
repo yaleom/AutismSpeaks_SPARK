@@ -1,32 +1,267 @@
 ---
-title: "Phenotype"
+title: "Phenotype QC"
 knit: (function(input_file, encoding) {
   out_dir <- 'docs';
   rmarkdown::render(input_file,
-  encoding=encoding,
-  output_file=file.path(dirname(input_file), out_dir, 'Phenotype.html'))})
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'Phenotype.html'))})
+author: "Ying Wang"
+date: "15/01/2021"
+output: 
+  html_document:
+   code_folding: hide
+   toc: true
+   toc_float: true
+   number_sections: TRUE
 ---
 
+<br><br>
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_SPARK/"
+knitr::opts_knit$set(root.dir = WD)
+knitr::opts_chunk$set(echo = FALSE)
+library(png)
+library(grid)
+library(DT)
 ```
 
-## R Markdown
+# Probands  {.tabset .tabset-fade .tabset-pills}
+- Note that the measurement of sum and mean is similar, thus only sum is presented.
+- Adjusted by **Age, Sex and 20PCs** and then rank-based invserse normalise transformed (RINT). **FSIQ** was not included as a covariate due to too many missing values.
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+<br>
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r phenotype_summary}
+sums <- read.table("outputs/phenotype_summary.txt", header = T)
+datatable(sums, rownames = FALSE, filter="top", caption = htmltools::tags$caption(
+        style = 'caption-side: top; text-align: center; color:black; 
+        font-size:200% ;',"Phenotype Summary"), options = list(pageLength = 5, scrollX=T) )
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r adj_phe, eval=FALSE, include=FALSE}
+###process phenotypes
+###############################################################################
+##extract phenotype IDs
+setwd("/QRISdata/Q3457/SPARK/pheno/SPARK_Collection_Version6")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+library(data.table)
+fam <- fread("../../genotypes/SPARK.WES1.release.2021_03.genotype.fam")
+eurs <- fread("/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/EUR.id", header = F)
+names(eurs) <- c("FID", "IID")
+##extract probs
+role_index <- fread("roles_index.csv")
+probs <- role_index[proband == "TRUE"][,.(family_sf_id, subject_sp_id)]
+length(intersect(probs$subject_sp_id,fam$V2)) ##8406
+
+names(probs) <- c("FID", "IID")
+
+probs_eur <- probs[IID %in% eurs$IID]
+fwrite(probs, "/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/probs.id", sep = "\t", col.names = F)
+fwrite(probs_eur, "/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/probs_eur.id", sep = "\t", col.names = F)
+
+##extract unaff_sibs
+sib <- fread("background_history_sibling.csv")
+unaff_sib <- sib[asd == "FALSE"][,.(family_sf_id, subject_sp_id)]
+length(intersect(unaff_sib$subject_sp_id,fam$V2)) ##2268
+
+names(unaff_sib) <- c("FID", "IID")
+unaff_sib_eur <- unaff_sib[IID %in% eurs$IID]
+
+fwrite(unaff_sib, "/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/unaffected_sibs.id", sep = "\t", col.names = F)
+fwrite(unaff_sib_eur, "/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/unaffected_sibs_eur.id", sep = "\t", col.names = F)
+
+
+###############################################################################
+##RINT phenotypes
+setwd("/QRISdata/Q3457/SPARK/pheno")
+library(data.table)
+fam <- fread("/QRISdata/Q3457/SPARK/genotypes/SPARK.WES1.release.2021_03.genotype.fam")
+probs <- fread("/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/probs.id", header = F)
+sibs <- fread("/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/unaffected_sibs.id", header = F)
+phe1 <- fread("RBS_R.txt")
+phe2 <- fread("SCQ.txt")
+pcs <- fread("/QRISdata/Q3457/SPARK/hrc_imputed/QCd/grm/1000G_SPARK_proj_pruned0.3.proj.eigenvec")[,c(1:22)]
+names(pcs) <- c("FID", "IID", paste0("PC", 1:20))
+
+phe1_2 <- phe1[,c(1:13, 17)][subject_sp_id %in% fam$V2]
+phe1_2[,FID := fam[match(phe1_2$subject_sp_id, fam$V2), V1]] ##6347
+phe1_probs <- phe1_2[subject_sp_id %in% probs$V2] ##5634
+
+phe2_2 <- phe2[,c(1:17, 21)][subject_sp_id %in% fam$V2]
+phe2_2[,FID := fam[match(phe2_2$subject_sp_id, fam$V2), V1]] ##7553
+phe2_probs <- phe2_2[subject_sp_id %in% probs$V2] ##6688
+
+##Note 1/0 intersecting with sibs ID
+
+names(phe1_probs)[1] <- "IID"
+phe1_probs <- pcs[phe1_probs, on = c("FID", "IID")]
+
+xnam <- paste("PC", 1:20, sep="")
+phe_adj1 <- phe1_probs[,c("FID", "IID", "Age_Months", "sex")]
+for(ncol in 25:34){
+  y <- colnames(phe1_probs)[ncol]
+  dat <- phe1_probs[,c(..y, "Age_Months", "sex", ..xnam)]
+  names(dat)[1] <- "Y"
+  
+  fmla <- as.formula(paste("Y ~ Age_Months + ", paste(xnam, collapse= "+") ))
+  phe_resids <- resid(lm(fmla, data = dat, na.action=na.exclude))
+  Tmp <- data.frame(phe1_probs[,c("FID", "IID", "sex")], phe_resids)
+  for(i in levels(factor(Tmp$sex))){
+    Tmp[Tmp$sex == i, "phe_resids"]<- qnorm((rank(Tmp[Tmp$sex == i,]$phe_resids,na.last="keep") - 0.5)/sum(!is.na(Tmp[Tmp$sex == i,]$phe_resids))) 
+  }
+  phe_rint <- Tmp[match(phe_adj1$IID, Tmp$IID), "phe_resids"]
+  phe_adj1[,y := phe_rint]
+  phe_adj1[,(ncol-20)] <- phe_rint
+  names(phe_adj1)[(ncol-20)] <- y
+}
+
+fwrite(phe_adj1, file = "/QRISdata/Q3490/SPARK/phenotypes/RBS_R_probands_adjPCs.txt", sep = "\t", na = NA)
+
+
+
+
+names(phe2_probs)[1] <- "IID"
+phe2_probs <- pcs[phe2_probs, on = c("FID", "IID")]
+
+xnam <- paste("PC", 1:20, sep="")
+phe_adj2 <- phe2_probs[,c("FID", "IID", "Age_Months", "sex")]
+for(ncol in 25:38){
+  y <- colnames(phe2_probs)[ncol]
+  dat <- phe2_probs[,c(..y, "Age_Months", "sex", ..xnam)]
+  names(dat)[1] <- "Y"
+  
+  fmla <- as.formula(paste("Y ~ Age_Months + ", paste(xnam, collapse= "+") ))
+  phe_resids <- resid(lm(fmla, data = dat, na.action=na.exclude))
+  Tmp <- data.frame(phe2_probs[,c("FID", "IID", "sex")], phe_resids)
+  for(i in levels(factor(Tmp$sex))){
+    Tmp[Tmp$sex == i, "phe_resids"]<- qnorm((rank(Tmp[Tmp$sex == i,]$phe_resids,na.last="keep") - 0.5)/sum(!is.na(Tmp[Tmp$sex == i,]$phe_resids))) 
+  }
+  phe_rint <- Tmp[match(phe_adj2$IID, Tmp$IID), "phe_resids"]
+  phe_adj2[,y := phe_rint]
+  phe_adj2[,(ncol-20)] <- phe_rint
+  names(phe_adj2)[(ncol-20)] <- y
+}
+
+fwrite(phe_adj2, file = "/QRISdata/Q3490/SPARK/phenotypes/SCQ_probands_adjPCs.txt", sep = "\t", na = NA)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Not Adjusted {.tabset .tabset-fade .tabset-pills}
+```{r plot_For_notadj, eval=FALSE, include=FALSE}
+library(data.table)
+library(ggplot2)
+setwd("/scratch/user/uqywan67/spark/data")
+
+phe_unadj <- fread("/QRISdata/Q3457/SPARK/pheno/RBS_R.txt")
+fam <- fread("SPARK_imputed_autosome_geno.05_maf.01_hwe1e-6_info.3.fam")
+probs <- fread("probs.id", header = F)
+
+phe_unadj1 <- phe_unadj[subject_sp_id %in% fam$V2 & subject_sp_id %in% probs$V2]
+
+vecs <- grep("sum", names(phe_unadj1))
+phe_unadj2 <- phe_unadj1[,c(1, ..vecs)]
+phe_unadj3 <- melt(phe_unadj2, id = "subject_sp_id")
+
+sums <- phe_unadj3[,.(sum(!is.na(value)), length(levels(factor(value)))), by = "variable"]
+names(sums) <- c("variable", "Counts", "levels")
+
+p <- ggplot(phe_unadj3,aes(x = value)) + 
+  geom_histogram(alpha = 0.8) +
+  #geom_text( aes(label= paste0(sCounts, " (", levels, ")"), x = 0, y = 250), hjust = -0.05 ) +
+  facet_wrap(~variable,scales = "free", nrow = 1) +     
+  
+  theme_bw() +
+  theme(
+    text = element_text(size=14, face="bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    legend.text = element_text(size = 16),
+    legend.title = element_blank()
+  ) +
+  ylab("Frequency") 
+
+ggsave(file.path("figures/RBS_R_probands_Notadj.png"), p, height = 5, width = 16, dpi = 300)
+
+
+
+phe_unadjII <- fread("/QRISdata/Q3457/SPARK/pheno/SCQ.txt")
+phe_unadjII1 <- phe_unadjII[subject_sp_id %in% fam$V2 & subject_sp_id %in% probs$V2]
+
+vecs <- grep("sum", names(phe_unadjII1))
+phe_unadjII2 <- phe_unadjII1[,c(1, ..vecs)]
+phe_unadjII3 <- melt(phe_unadjII2, id = "subject_sp_id")
+
+sums2 <- phe_unadjII3[,.(sum(!is.na(value)), length(levels(factor(value)))), by = "variable"]
+names(sums2) <- c("variable", "Counts", "levels")
+
+p2 <- ggplot(phe_unadjII3,aes(x = value)) + 
+  geom_histogram(alpha = 0.8) +
+  #geom_text( aes(label= paste0(sCounts, " (", levels, ")"), x = 0, y = 250), hjust = -0.05 ) +
+  facet_wrap(~variable,scales = "free", nrow = 2) +     
+  
+  theme_bw() +
+  theme(a
+    text = element_text(size=14, face="bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    legend.text = element_text(size = 16),
+    legend.title = element_blank()
+  ) +
+  ylab("Frequency") 
+
+ggsave(file.path("figures/SCQ_probands_Notadj.png"), p2, height = 10, width = 16, dpi = 300)
+
+
+sums_all <- rbind(sums, sums2)
+fwrite(sums_all, file = "phenotype_summary.txt", sep = "\t")
+
+```
+
+
+### RBS-R 
+```{r plot_rbs-r, out.width="100%", out.height="100%", dpi=300}
+grid.raster(readPNG("figures/RBS_R_probands_Notadj.png"))
+```
+
+<br>
+
+
+
+***
+
+
+### SCQ
+```{r plot_scq, out.width="100%", out.height="100%", dpi=300}
+grid.raster(readPNG("figures/SCQ_probands_Notadj.png"))
+```
+
+<br>
+
+
+***
+
+<br>
+
+## Adjusted {.tabset .tabset-fade .tabset-pills}
+
+### RBS-R
+```{r plot_rbs-r_adj, out.width="100%", out.height="100%", dpi=300}
+grid.raster(readPNG("figures/RBS_R_probands_adj.png"))
+```
+
+<br>
+
+***
+
+### SCQ
+```{r plot_scq_adj, out.width="100%", out.height="100%", dpi=300}
+grid.raster(readPNG("figures/SCQ_probands_adj.png"))
+```
+
+<br>
+
+
+***
+
+
