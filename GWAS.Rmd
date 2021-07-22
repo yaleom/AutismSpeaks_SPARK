@@ -132,6 +132,7 @@ img <- readPNG("figures/manhattan_probands_all.png")
 grid.raster(img)
 ```
 
+
 ***
   
 <br>
