@@ -4,28 +4,28 @@
 #                                  
 ####=================================================================####
 
-genodir="/QRISdata/Q3457/AGP/GenotypeFiles/phg000294.v1.NIMH_AutismGenomeProject_v2.genotype-calls-matrixfmt.c1.ARD"
-outdir="/QRISdata/Q3490/AGP/QCd"
-bfile="SubjectGenotypeFile.AGP.phs000267.v1.p1.20120806"
-scriptdir="/30days/uqywan67/AGP/scripts"
-plotdir="/30days/uqywan67/AGP/outputs"
-rangefile="/QRISdata/Q3490/SSC/QCd/high-LD-regions-hg19-GRCh37.txt"
 
 ###Delta2 version
-genodir="/afm01/UQ/Q3457/AGP/GenotypeFiles/phg000294.v1.NIMH_AutismGenomeProject_v2.genotype-calls-matrixfmt.c1.ARD"
-outdir="/afm01/UQ/Q3490/AGP/QCd"
-bfile="SubjectGenotypeFile.AGP.phs000267.v1.p1.20120806"
-scriptdir="/scratch/90days/uqywan67/auti_proj/AGP/scripts"
-plotdir="/scratch/90days/uqywan67/auti_proj/AGP/outputs"
+genodir="/afm01/UQ/Q3457/SPARK/genotypes"
+outdir="/afm01/UQ/Q3490/SPARK/QCd"
+bfile="SPARK.WES1.release.2021_03.genotype"
+scriptdir="/scratch/90days/uqywan67/auti_proj/AutismSpeaks_SPARK/scripts"
+plotdir="/scratch/90days/uqywan67/auti_proj/AutismSpeaks_SPARK/outputs"
 rangefile="/afm01/UQ/Q3490/SSC/QCd/high-LD-regions-hg19-GRCh37.txt"
 ####==========================================================================================####
 ####========================Step1: Pre-QC using raw genotype files============================####
 ####==========================================================================================####
 ###1.1 Check sex~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~####
 
+#get a list of QCd SNPs
+plink --bfile $genodir/${bfile} \
+--geno 0.05 --hwe 1e-6 --mind 0.1 --maf 0.01 \
+--make-just-bim --out $outdir/${bfile}_qcd
+
 #calculate F-statistic based on QCd chr23 SNPs only
 plink --bfile $genodir/${bfile} \
  --check-sex  \
+ --extract $outdir/${bfile}_qcd.bim \
  --out $outdir/${bfile}_checksex
 
 #F > 0.8 coded as male, F < 0.2 coded as female; Note those individuals with extreme values
@@ -39,6 +39,7 @@ plink --bfile $genodir/${bfile} \
 --make-bed \
 --out $genodir/${bfile}
 
+######################################skip this for now######################################
 
 ##summary checksex information 
 Rscript $scriptdir/plot_checkSex.R $outdir/${bfile}_checksex.sexcheck $plotdir/sexD.png
@@ -46,13 +47,13 @@ Rscript $scriptdir/plot_checkSex.R $outdir/${bfile}_checksex.sexcheck $plotdir/s
 
 ###1.2 IBD estimation~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~####
 #prune SNPs and using only ~50K SNPs, exclude high LD regions
-r2=0.05 #might try a range of different r2 values to get ~50K SNPs for further analysis
+r2=0.02 #might try a range of different r2 values to get ~50K SNPs for further analysis
 plink --bfile $genodir/${bfile} \
  --geno 0.05 --maf 0.01 --mind 0.2 --hwe 1e-6 \
  --indep-pairwise 50 10 $r2 \
  --chr 1-22 \
---exclude range $rangefile \
---out $outdir/${bfile}_pruned
+ --exclude range $rangefile \
+ --out $outdir/${bfile}_pruned
 
 #estimate based on same family
 plink --bfile $genodir/${bfile} \

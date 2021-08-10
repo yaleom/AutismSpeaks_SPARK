@@ -1,0 +1,44 @@
+name: "SPARK Data Process Pipeline"
+output_dir: "docs"
+navbar:
+  title: "Austim Speaks | SPARK"
+  right:
+    - text: "Introduction"
+      href: index.html
+    - text: "Genotype"
+      href: Genotype.html
+    - text: "Phenotype"
+      href: Phenotype.html
+    - text: "GWAS"
+      href: GWAS.html
+    - text: "Exome"
+      href: Exome.html
+
+#   - text: "Pheno"
+#      menu:
+#      - text: "heading 1"
+#      - text: "page 1"
+#        href: page1.html
+#      _ text: "page 2"
+#        href: page2.html
+#      - text: "---------"
+#      - text: "page 3"
+#        href: page3.html
+#      - text: "page 4"
+#        href: page4.html
+#     href: 1_Phenotype.html
+  left:
+    - icon: fa-github
+      href: https://github.com/yaleom
+#    - icon: fa-twitter
+#      href: https://twitter.com/waterallq
+
+output:
+  html_document:
+    theme: paper
+    highlight: textmate
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+    lib_dir: site_libs

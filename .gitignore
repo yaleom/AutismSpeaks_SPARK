@@ -40,4 +40,6 @@ vignettes/*.pdf
 
 
 # define by myself
-./outputs
+#./outputs
+./*Rmd
+./figures

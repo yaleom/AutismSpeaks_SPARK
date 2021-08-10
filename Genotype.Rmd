@@ -1,0 +1,225 @@
+---
+title: "Genotype"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+  encoding=encoding,
+  output_file=file.path(dirname(input_file), out_dir, 'Genotype.html'))})
+
+output:
+  html_document:
+   code_folding: hide
+   toc: true
+   toc_float: true
+   number_sections: TRUE
+---
+
+```{r setup, include=FALSE}
+WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_SPARK/"
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warnings = FALSE)
+knitr::opts_chunk$set(message  = FALSE)
+#knitr::opts_chunk$set(eval = FALSE)
+knitr::opts_knit$set(root.dir = WD)
+
+library(reshape2)
+library(ggplot2)
+library(plyr)
+library(knitr)
+library(rmarkdown)
+library(dplyr)
+library(plotly)
+library(gapminder)
+library(DT)
+require("ggrepel")
+library(grid)
+library(gridExtra)
+library(png)
+library(grid)
+library(data.table)
+```
+
+# Dataset Description
+
+A total of **26,890** individuals from **8,698** families were genotyped on the GSA-24v1-0_A1.
+
+ - 15,138 males, 11,752 females.
+ - Individuals in a single family ranged from 2 to 10!
+ - 634,709 SNPs were included in the genotype files. 
+ - Note that coordinates were based on **Build38**.
+ 
+ 
+```{r dataset_check, eval=FALSE, include=FALSE}
+setwd("/afm01/UQ/Q3457/SPARK/genotypes/")
+fam <- fread("SPARK.WES1.release.2021_03.genotype.fam")
+
+fam[!duplicated(V1), .N]
+##8698 families
+
+fam[,.N, by = V5]
+#    V5     N
+# 1:  2 11752
+# 2:  1 15138
+
+fam[,.(Freq =.N), by = V1][,.N, by = Freq]
+#     Freq    N
+#  1:    2 2493
+#  2:    3 2767
+#  3:    4 3047
+#  4:    5  179
+#  5:    6   43
+#  6:    1  155
+#  7:    7    9
+#  8:    8    2
+#  9:    9    2
+# 10:   10    1
+
+```
+
+ ***
+ 
+<br>
+
+# Raw Genotype QC 
+
+## Sex Check  {.tabset .tabset-fade .tabset-pills}
+- Based on 6,995 QCd (\--geno 0.05 \--maf 0.01 \--hwe 1e-6 \--mind 0.1) CHR-X SNPs.
+- 147 PRROBLEM
+  - 130 ambiguous SNPSEX (close to 0.2/0.8)
+  - 17 with SNPSEX different from PEDSEX (Need further explorations)
+ 
+### Mismatch summary
+```{r}
+sex <- fread("outputs/SPARK.WES1.release.2021_03.genotype_checksex.sexcheck")
+sex1 <- sex[STATUS == "PROBLEM" & !is.na(F),] ##147 rows
+
+datatable(sex1, rownames = FALSE, filter="top", caption = htmltools::tags$caption(
+        style = 'caption-side: top; text-align: center; color:black; 
+        font-size:200% ;',"Individuals with discordant sex information"), options = list(pageLength = 5, scrollX=T) )
+```
+
+
+***
+ 
+<br>
+ 
+ 
+### ChrX F distributions
+```{r sex-dist, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/sexD.png"))
+```
+
+***
+ 
+<br>
+ 
+
+## Pariwise IBD estimation {.tabset .tabset-fade .tabset-pills}
+
+- Relationships (RT): OT (Others), FS (Full Siblings), HS (Half Siblings), PO (Parent Offspring) 
+- IBS sharing for other pairs, ranging 
+  - from 0.20 to 1.00 in FS, 
+  - from 0.45 to 0.64 in PO, 
+  - from 0.00 to 0.55 in OT 
+  - indicating inbreeding between some parents and possible relatives between families as multiplex included.
+
+
+```{r read_genome, include=FALSE, eval=FALSE}
+genome <- fread("outputs/SPARK.WES1.release.2021_03.genotype_pruned_IBD.genome")
+genome[,.(count = .N, mins = min(PI_HAT), maxs = max(PI_HAT)), by = RT]
+#    RT count   mins   maxs
+# 1: PO 21619 0.4519 0.6364
+# 2: OT  5836 0.0000 0.5582
+# 3: FS  4408 0.2026 1.0000
+# 4: HS    10 0.2113 0.5788
+```
+
+***
+ 
+<br>
+ 
+
+### Estimated pairwise IBD distributions
+```{r IBD-dist, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/IBD.png"))
+```
+
+***
+ 
+<br>
+ 
+
+## Individual genome-wide heterozygosity {.tabset .tabset-fade .tabset-pills}
+
+### Genome-wide heterozygosity VS missing rates 
+```{r genomewideHet, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/Het_VS_missing.png"))
+```
+
+***
+ 
+<br>
+ 
+
+### Genome-wide F VS missing rates 
+```{r genomewideF, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/inbreeding_VS_missing.png"))
+```
+
+***
+ 
+<br>
+ 
+
+# Imputation
+
+## Pre-imputation
+The imputation pipeline follows that used for SSC dataset. A total of **26867** individuals and ~400K autosomal, ~7K chrX SNPs were used for further impution.
+
+- filters: \--geno 0.05 \--mind 0.1 \--maf 0.01 \--hwe 1e-6
+  - 23 people removed due to missing genotype data (--mind)..
+  - Total genotyping rate in remaining samples is 0.981795.
+  - 41406 variants removed due to missing genotype data (--geno).
+  - 62974 variants removed due to Hardy-Weinberg exact test.
+
+
+***
+ 
+<br>
+ 
+## After Imputation
+### Frequency distribution
+
+ - ~6.5M SNPs overlapped SNPs between SPARK_imputed and HRC_WGS (passing filters: \--geno 0.05 \--maf 0.01 \--hwe 1e-6)
+ - based on same allele
+ - **1,376 SNPs with MAF difference > 0.2**
+
+```{r frq_dis, out.width="100%", out.height="100%", warning=FALSE}
+grid.raster(readPNG("outputs/frqcheck.png"))
+```
+
+***
+
+<br>
+
+### PCA 
+
+- Project the first 3 PCs based on pruned HapMap3 SNPs onto 1000G
+- Using K-means to calculate distance
+- Assign ancestry based on posterior probability 0.9
+  - 20,353 Europeans (EUR), 4,068 Americans (AMR),  565 South-Asians (SAS), 364 East-Asians (EAS) and 1,024 Africans (AFR).
+
+```{r plot_anc_all, out.width="80%", out.height="60%", echo=FALSE}
+
+toAssign <- fread("outputs/SPARK_anc.txt", header = T)
+
+ggplot(data = toAssign, aes(x = PC1, y = PC2, color = Assigned)) +
+  geom_point() +
+  ylab("PC2") +
+  xlab("PC1")
+```
+
+***
+
+<br>
+

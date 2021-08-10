@@ -1,0 +1,13 @@
+variable	Counts	levels
+RBS_R_RMB_sum	5629	22
+RBS_R_SIB_sum	5629	25
+RBS_R_Compulsions_sum	5629	31
+RBS_R_IS_sum	5629	34
+RBS_R_CI_sum	5628	7
+SCQ_Proband_RMB_sum	6632	3
+SCQ_Proband_IS_sum	5393	3
+SCQ_Proband_UI_sum	6595	5
+SCQ_Proband_SM_sum	6534	8
+SCQ_Proband_PFC_sum	6535	6
+SCQ_Proband_PNFC_sum	6496	8
+SCQ_SC_sum	6387	13

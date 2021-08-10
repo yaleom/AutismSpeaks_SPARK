@@ -1,0 +1,167 @@
+---
+title: "Phenotype QC"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'GWAS.html'))})
+output: 
+  html_document:
+   code_folding: hide
+   toc: true
+   toc_float: true
+   number_sections: TRUE
+---
+
+<br><br>
+
+```{r setup, include=FALSE}
+WD="~/OneDrive - The University of Queensland/mater_projs/auti_proj/AutismSpeaks_SPARK/"
+knitr::opts_knit$set(root.dir = WD)
+knitr::opts_chunk$set(echo = FALSE)
+library(png)
+library(grid)
+library(DT)
+```
+***
+  
+  <br>
+  
+# GWAS Strategy
+GWAS was run using MLM model in [GCTA1.93.2](https://cnsgenomics.com/software/gcta/). The phenotypes were pre-adjusted by age, sex, and 20 PCs
+
+
+```{r merge_GWAS_probands, eval=FALSE, include=FALSE}
+setwd("/scratch/user/uqywan67/spark/gwas")
+
+library(data.table)
+library(qqman)
+
+summs <- read.table("../data/phenotype_summary.txt", header = T, stringsAsFactors = F)
+
+alls_eur <- data.frame()
+
+png("../data/figures/qq_probands_eur.png",width=35, height = 21, units = "in", res = 300)
+par(mfrow=c(3,4))
+par(mar=c(5,5,5,5))
+
+for(phe in levels(factor(summs$variable))){
+ tmp1 <- fread(paste0("spark_probandsEUR_", phe, ".mlma"))
+ 
+ tmp1_2 <- tmp1[p < 1e-5,] 
+ tmp1_2[, phenotype := phe]
+ alls_eur <- rbind(alls_eur, tmp1_2)
+ qq(tmp1$p, main = phe, xlim = c(0, 10), ylim = c(0,10), pch = 18, col = "blue4", cex.main = 3, cex.lab =2, cex.axis = 2, las = 1)
+}
+dev.off()
+
+
+alls <- data.frame()
+
+png("../data/figures/qq_probands_all.png",width=35, height = 21, units = "in", res = 300)
+par(mfrow=c(3,4))
+par(mar=c(5,5,5,5))
+
+for(phe in levels(factor(summs$variable))){
+  tmp2 <- fread(paste0("spark_probandsAll_", phe, ".mlma")) 
+  tmp2_2 <- tmp2[p < 1e-5,] 
+  tmp2_2[, phenotype := phe]
+  alls <- rbind(alls, tmp2_2)
+  qq(tmp2$p, main = phe, xlim = c(0, 10), ylim = c(0,10), pch = 18, col = "blue4", cex.main = 3, cex.lab =2, cex.axis = 2, las = 1)
+}
+dev.off()
+
+names(alls_eur) <- c("CHR", "SNP", "BP", "A1", "A2", "Freq",  "b", "se", "P", "phenotype")
+names(alls) <- c("CHR", "SNP", "BP", "A1", "A2", "Freq",  "b", "se", "P", "phenotype")
+
+write.table(alls_eur, file = "../data/probandsEUR_p1e-5_summary.txt", col.names = T, row.names = F, quote = F, sep = "\t")
+write.table(alls, file = "../data/probandsAll_p1e-5_summary.txt", col.names = T, row.names = F, quote = F, sep = "\t")
+
+
+png("../data/figures/manhattan_probands_eur.png",width=35, height = 21, units = "in", res = 300)
+par(mfrow=c(3,4))
+par(mar=c(5,5,5,5))
+for(phe in levels(factor(alls_eur$phenotype))){
+  dat <- alls_eur[alls_eur$phenotype == phe,]
+  manhattan(dat, main = phe, ylim = c(5, 10), col = c("blue4", "orange3"), suggestiveline = F, genomewideline = -log10(5e-08), cex = 3, annotatePval = 5e-8, annotateTop = F,  cex.main = 3, cex.lab =2, cex.axis = 2
+  )
+}
+
+dev.off()
+
+png("../data/figures/manhattan_probands_all.png",width=35, height = 21, units = "in", res = 300)
+par(mfrow=c(3,4))
+par(mar=c(5,5,5,5))
+for(phe in levels(factor(alls$phenotype))){
+  dat <- alls[alls$phenotype == phe,]
+  manhattan(dat, main = phe, ylim = c(5, 10), col = c("blue4", "orange3"), suggestiveline = F, genomewideline = -log10(5e-08), cex = 3, annotatePval = 5e-8, annotateTop = F,  cex.main = 3, cex.lab =2, cex.axis = 2
+  )
+}
+
+dev.off()
+
+```
+
+
+***
+  
+<br> 
+  
+# Probands  
+## All Individuals  {.tabset .tabset-fade .tabset-pills}
+- 6,558,644 QCd SNPs with MAF > 0.01 included
+- GWAS was run on all individuals (ranging from 5628 to 6595) including diverse ancestry backgrounds.
+- Signals with association p-value < 1e-5 will be shown for Manhattan Plots.
+
+### QQ Plot 
+
+```{r echo=FALSE, out.width="100%", out.height="100%"}
+#grid.raster(readPNG("figures/manhplot_probands_adjIQ_1e-5_primary_withPCs.png")
+img <- readPNG("figures/qq_probands_all.png")
+grid.raster(img)
+```
+
+***
+
+<br>
+
+
+### Manhattan Plot 
+```{r echo=FALSE, out.width="100%", out.height="100%"}
+img <- readPNG("figures/manhattan_probands_all.png")
+grid.raster(img)
+```
+
+
+***
+  
+<br>
+
+
+## Europeans Only  {.tabset .tabset-fade .tabset-pills}
+- ~5K European individuals are included
+- Signals with association p-value < 1e-5 will be shown for Manhattan Plots.
+
+### QQ Plot 
+
+```{r echo=FALSE, out.width="100%", out.height="100%"}
+img <- readPNG("figures/qq_probands_eur.png")
+grid.raster(img)
+```
+
+***
+
+<br>
+
+
+### Manhattan Plot 
+```{r echo=FALSE, out.width="100%", out.height="100%"}
+img <- readPNG("figures/manhattan_probands_eur.png")
+grid.raster(img)
+```
+
+***
+  
+<br>
+
+
