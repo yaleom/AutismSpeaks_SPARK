@@ -23,7 +23,7 @@ PGC: https://www.med.unc.edu/pgc/download-results/
   - daner_adhd_meta_filtered_NA_iPSYCH23_PGC11_sigPCs_woSEX_2ell6sd_EUR_Neff_70.meta.gz
   - We report a genome-wide association meta-analysis of 20,183 individuals diagnosed with ADHD and 35,191 controls 
   - n=55374
-- ADHD-ASD-TS
+- ADHD-ASD-TS (from Yang et al, 2019, Cross-disorder GWAS meta-analysis for Attention Deficit/Hyperactivity Disorder, Autism Spectrum Disorder, Obsessive Compulsive Disorder, and Tourette Syndrome.)
   - N=53293+46351+12515 (112159)
-- ADHD-ASD-OCD-TS
+- ADHD-ASD-OCD-TS (from Yang et al, 2019, Cross-disorder GWAS meta-analysis for Attention Deficit/Hyperactivity Disorder, Autism Spectrum Disorder, Obsessive Compulsive Disorder, and Tourette Syndrome.)
   - N=53293+46351+9725+12515 (121884)
