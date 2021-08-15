@@ -11,6 +11,8 @@ navbar:
       href: Phenotype.html
     - text: "GWAS"
       href: GWAS.html
+    - text: "Meta"
+      href: Meta.html
     - text: "Exome"
       href: Exome.html
 

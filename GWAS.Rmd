@@ -22,6 +22,7 @@ knitr::opts_chunk$set(echo = FALSE)
 library(png)
 library(grid)
 library(DT)
+library(data.table)
 ```
 ***
   
@@ -113,6 +114,17 @@ dev.off()
 - GWAS was run on all individuals (ranging from 5628 to 6595) including diverse ancestry backgrounds.
 - Signals with association p-value < 1e-5 will be shown for Manhattan Plots.
 
+### Association summary
+
+```{r}
+iqs2 <- fread("outputs/probandsAll_p1e-5_summary.txt")
+datatable(iqs2, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+```
+
+***
+
+<br>
+
 ### QQ Plot 
 
 ```{r echo=FALSE, out.width="100%", out.height="100%"}
@@ -141,6 +153,19 @@ grid.raster(img)
 ## Europeans Only  {.tabset .tabset-fade .tabset-pills}
 - ~5K European individuals are included
 - Signals with association p-value < 1e-5 will be shown for Manhattan Plots.
+
+
+### Association summary
+
+```{r}
+iqs2 <- fread("outputs/probandsEUR_p1e-5_summary.txt")
+datatable(iqs2, rownames = FALSE, filter="top", options = list(pageLength = 5, scrollX=T) )
+```
+
+***
+
+<br>
+
 
 ### QQ Plot 
 
